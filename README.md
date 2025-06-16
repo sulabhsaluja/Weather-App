@@ -1,4 +1,4 @@
----
+
 
 # 🌦️ Weather App
 
@@ -87,4 +87,4 @@ open index.html
 
 This project is open source and available under the [MIT License](LICENSE).
 
----
+
