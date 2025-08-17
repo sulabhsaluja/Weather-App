@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🌤 Weather App</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -23,7 +24,7 @@
       border-radius: 20px;
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
       text-align: center;
-      max-width: 600px;
+      max-width: 800px;
       width: 100%;
     }
     h1 {
@@ -94,6 +95,23 @@
       line-height: 1.8;
     }
     #current-weather h2 { margin-bottom: 10px; }
+
+    /* Chart Section */
+    .chart-container {
+      display: none;
+      margin-top: 20px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+    }
+    .chart-container h3 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 1.2rem;
+      color: #ffdd57;
+    }
+    canvas { background: transparent; }
   </style>
 </head>
 <body>
@@ -106,6 +124,10 @@
     <button id="unit-toggle">°C / °F</button>
 
     <div id="current-weather"></div>
+    <div class="chart-container">
+      <h3>📊 5-Day Forecast</h3>
+      <canvas id="weather-chart"></canvas>
+    </div>
   </div>
 
   <script>
@@ -114,7 +136,9 @@
     const searchBtn = document.getElementById("search-btn");
     const cityInput = document.getElementById("city-input");
     const unitToggle = document.getElementById("unit-toggle");
+    const chartContainer = document.querySelector(".chart-container");
     let currentUnit = "metric"; 
+    let weatherChart;
 
     const weatherIcons = {
       Clear: "☀️",
@@ -136,6 +160,7 @@
 
     async function fetchWeather(city) {
       try {
+        // Current weather
         const weatherRes = await fetch(
           `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=${currentUnit}&appid=${apiKey}`
         );
@@ -143,12 +168,21 @@
 
         if (weatherData.cod !== 200) {
           currentWeatherDiv.innerHTML = `<p>❌ City not found</p>`;
+          chartContainer.style.display = "none"; // hide chart
           return;
         }
 
+        // Forecast (5 days)
+        const forecastRes = await fetch(
+          `https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=${currentUnit}&appid=${apiKey}`
+        );
+        const forecastData = await forecastRes.json();
+
         displayWeather(weatherData);
+        displayChart(forecastData);
       } catch (error) {
         currentWeatherDiv.innerHTML = `<p>⚠️ Error fetching data</p>`;
+        chartContainer.style.display = "none";
       }
     }
 
@@ -164,6 +198,51 @@
         <p><b>🌬 Wind:</b> ${data.wind.speed} ${currentUnit === "metric" ? "m/s" : "mph"}</p>
         <p><b>📋 Condition:</b> ${data.weather[0].description}</p>
       `;
+    }
+
+    function displayChart(forecastData) {
+      const labels = [];
+      const temps = [];
+      const unitSymbol = currentUnit === "metric" ? "°C" : "°F";
+
+      // Pick one forecast per day (every 8th item ≈ 24h)
+      for (let i = 0; i < forecastData.list.length; i += 8) {
+        const item = forecastData.list[i];
+        const date = new Date(item.dt * 1000);
+        labels.push(date.toLocaleDateString("en-US", { weekday: "short" }));
+        temps.push(item.main.temp);
+      }
+
+      if (weatherChart) weatherChart.destroy();
+
+      const ctx = document.getElementById("weather-chart").getContext("2d");
+      weatherChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `Temperature (${unitSymbol})`,
+            data: temps,
+            borderColor: "#ffdd57",
+            backgroundColor: "rgba(255, 221, 87, 0.2)",
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: "#ffdd57",
+            pointRadius: 5,
+            pointHoverRadius: 7
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: "#fff" } } },
+          scales: {
+            x: { ticks: { color: "#fff" }, grid: { color: "rgba(255,255,255,0.2)" } },
+            y: { ticks: { color: "#fff" }, grid: { color: "rgba(255,255,255,0.2)" } }
+          }
+        }
+      });
+
+      chartContainer.style.display = "block";
     }
 
     // Search button
